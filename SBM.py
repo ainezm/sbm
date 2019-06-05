@@ -16,7 +16,7 @@ class SBM:
 
 		#create k dense blocks on the diagonal
 		for i in range(self.k):
-			A11 = np.triu(np.random.rand(self.n))
+			A11 = np.triu(np.random.rand(self.n, self.n))
 			A11[A11 > self.a/self.n] = 0
 			A[i*self.n:(i+1)*self.n,i*self.n:(i+1)*self.n] = A11
 
@@ -24,6 +24,7 @@ class SBM:
 
 		#ensure symmetry - construct adjacency matrix
 		A = A+A.T
+
 		A[A > 0] = 1
 
 		#find edge idxs
@@ -45,9 +46,7 @@ class SBM:
 
 		# construct adjacency matrix over the random split
 		A = A+A.T
-		A[A > 0] = 1
 		B = B+B.T
-		B[B > 0] = 1
 
 		aa = A
 		bb = B
@@ -105,7 +104,6 @@ class SBM:
 		idextra = np.argmax(dxs, axis = 0)
 
 		outCxs = self.construct_outCxs_2(outCxs,extra,idextra)
-
 		outCxs = self.correction(outCxs, A)
 
 		#clustering Y
@@ -118,14 +116,22 @@ class SBM:
 			dxs.append(np.sum(C1, axis=0))
 
 		idY = np.argmax(dxs, axis = 0)
-
+		indices = np.array([])
 		for i in range(len(outCxs)):
 			outCx = np.union1d(outCxs[i],Y[np.where(idY == i)])
-			outCxs[i] = np.random.shuffle(outCx)
-
+			np.random.shuffle(outCx)
+			indices = np.concatenate((indices, outCx))
 		A = aa+bb
-
-		plt.imshow(A[outCxs,outCxs]);
+		f = plt.figure(0)
+		plt.imshow(A);
+		plt.colorbar()
+		indices = indices.astype(int)
+		f = plt.figure(1)
+		plt.imshow(A[indices,:][:,indices]);
+		plt.colorbar()
+		indices_2 = np.random.permutation(self.n*self.k)
+		f_2 = plt.figure(2)
+		plt.imshow(A[indices_2,:][:,indices_2]);
 		plt.colorbar()
 		plt.show()
 
@@ -147,16 +153,17 @@ class SBM:
 
 		newOutCxs = []
 		for block1 in range(self.k):
-			xy = set()
-			yx = set()
+			xy = []
+			yx = []
 			for block2 in range(self.k):
 				if block2 == block1:
 					continue
+
 				xy = np.union1d(xy, bad_xy[(block1, block2)])
 				yx = np.union1d(yx, bad_xy[(block2, block1)])
 
 			outCx = np.setdiff1d(outCxs[block1], xy).astype(int)
-			outCx = np.union1d(outCx, yx).astype(int)	
+			outCx = np.union1d(outCx, yx).astype(int)
 			newOutCxs.append(outCx)
 		return newOutCxs
 
@@ -164,11 +171,11 @@ class SBM:
 
 
 	def construct_outCxs_2(self, outCxs, extra, idextra):
-		outCxs = []
+		outCxs_list = []
 		for i in range(len(outCxs)):
 			outCx = np.union1d(outCxs[i], extra[np.where(idextra == i)[0]]).astype(int)
-			outCxs.append(outCx)
-		return outCxs
+			outCxs_list.append(outCx)
+		return outCxs_list
 
 
 
@@ -198,7 +205,7 @@ class SBM:
 
 
 if __name__ == "__main__":
-	s = SBM(3, 100, 20, 1)
+	s = SBM(2, 100, 20, 1)
 	s.generate_model()
 
 
