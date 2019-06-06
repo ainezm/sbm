@@ -11,11 +11,12 @@ class SBM:
 
 	def run(self):
 		A = self.generate_model()
-		f = plt.figure(2)
+		f = plt.figure("original blocked")
 		plt.imshow(A);
 		plt.colorbar()
 		A,B = self.split_red_blue_edges(A)
-		self.spectral_partition(A,A.copy(),B)
+		(outCxs, Z, Y) = self.spectral_partition(A)
+		self.rest(outCxs, A, B, Z, Y)
 
 
 	def generate_model(self):
@@ -51,11 +52,11 @@ class SBM:
 
 		A = np.zeros((self.n*self.k, self.n*self.k))
 		for x, y in zip(ai[edges1],aj[edges1]):
-			A[reordering[x],reordering[y]] = 1
+			A[x,y] = 1
 
 		B = np.zeros((self.n*self.k, self.n*self.k))
 		for x, y in zip(ai[edges2],aj[edges2]):
-			B[reordering[x],reordering[y]] = 1
+			B[x,y] = 1
 
 		# construct adjacency matrix over the random split
 		A = A+A.T
@@ -63,24 +64,25 @@ class SBM:
 
 		return A, B
 
-	def spectral_partition(self, A, aa, bb):
+	def spectral_partition(self, A):
 
 		#Spectral partition part
 		#Randomly select about half indices in range(k*n)
 		r = np.random.rand(self.k*self.n,1)
 		Y = np.where(r > .5)[0]
-		Z = np.where(r < .5)[0]
+		Z = np.where(r <= .5)[0]
 
 		#Randomly select about half of those indices
 		r = np.random.rand(len(Y),1)
 		Y1 = Y[np.where(r > .5)[0]]
-		Y2 = Y[np.where(r < .5)[0]]
+		Y2 = Y[np.where(r <= .5)[0]]
 
 		#select half rows and quarter (approx) columns randomly from A
 		A1 = A[Z, :][:,Y1]
 
 		#singular value decomposition of A1
 		U,S,V = np.linalg.svd(A1)
+		V = V.T
 		
 		#get k largest singular values
 		max_S = np.argsort(S)[:self.k]
@@ -100,25 +102,27 @@ class SBM:
 		VV = np.zeros((self.k,int(self.n/2)))
 		for i in range(self.k):
 			e1 = projY2[:,i]
-			idx = np.argsort(e1)[::-1][:int(self.n/2)]
+			idx = np.argsort(-e1)[:int(self.n/2)]
 			VV[i,:] = Z[idx]
 
-		outCxs = self.construct_outCx(VV)
-		ns = [len(x) for x in outCxs]
+		outCxs = []
+		for block1 in range(self.k):
+			outCx = np.setdiff1d(VV[block1,:],VV[list(range(block1)),:]).astype(int)
+			outCxs.append(outCx)
+
+		return outCxs, Z, Y
+
+	def rest(self, outCxs, aa, bb, Z, Y):
 
 		#find every idx in Z not in any outCx
 		extra = Z
 		for outCx in outCxs:
 			extra = np.setdiff1d(extra, outCx).astype(int)
-
 		#the original adjacency matrix- combining blue and red edges
 		A = aa+bb
 
-		dxs = self.construct_dx(A, outCxs, extra)
-		idextra = np.argmax(dxs, axis = 0)
-
-		outCxs = self.construct_outCxs_2(outCxs,extra,idextra)
-		outCxs = self.correction(outCxs, A)
+		outCxs = self.correction(outCxs, extra, A)
+		outCxs = self.merge(outCxs, A)
 
 		#clustering Y
 		A = bb
@@ -136,11 +140,11 @@ class SBM:
 			np.random.shuffle(outCx)
 			indices = np.concatenate((indices, outCx))
 		A = aa+bb
-		f = plt.figure(0)
+		f = plt.figure("shuffled input")
 		plt.imshow(A);
 		plt.colorbar()
 		indices = indices.astype(int)
-		f = plt.figure(1)
+		f = plt.figure("recovered output")
 		plt.imshow(A[indices,:][:,indices]);
 		plt.colorbar()
 		# indices_2 = np.random.permutation(self.n*self.k)
@@ -152,7 +156,7 @@ class SBM:
 
 
 
-	def correction(self, outCxs, A):
+	def merge(self, outCxs, A):
 		dZZ = 1.5*(self.a+self.b)/4
 		bad_xy = {}
 		for block1 in range(self.k):
@@ -184,7 +188,16 @@ class SBM:
 
 
 
-	def construct_outCxs_2(self, outCxs, extra, idextra):
+	def correction(self, outCxs, extra, A):
+
+		dxs = []
+		for outCx in outCxs:
+			Cx = A[outCx,:][:,extra]
+			dx = np.sum(Cx, axis = 0)
+			dxs.append(dx)
+		
+		idextra = np.argmax(dxs, axis = 0)
+
 		outCxs_list = []
 		for i in range(len(outCxs)):
 			outCx = np.union1d(outCxs[i], extra[np.where(idextra == i)[0]]).astype(int)
@@ -193,33 +206,9 @@ class SBM:
 
 
 
-	def construct_dx(self, A, outCxs, extra):
-		dxs = []
-		for outCx in outCxs:
-			Cx = A[outCx,:][:,extra]
-			dx = np.sum(Cx, axis = 0)
-			dxs.append(dx)
-
-		return dxs
-
-
-	def construct_outCx(self, VV):
-		outCxs = []
-		for block1 in range(self.k):
-			outCx = np.setdiff1d(VV[block1,:],VV[np.delete(list(range(self.k)), block1),:]).astype(int)
-			outCxs.append(outCx)
-		return outCxs
-
-
-		
-
-
-
-
-
 
 if __name__ == "__main__":
-	s = SBM(3, 1000, 200, 50)
+	s = SBM(3, 1000, 50, 5)
 	s.run()
 
 
