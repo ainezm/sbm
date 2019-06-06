@@ -9,6 +9,15 @@ class SBM:
 		self.a = float(a)
 		self.b = float(b)
 
+	def run(self):
+		A = self.generate_model()
+		f = plt.figure(2)
+		plt.imshow(A);
+		plt.colorbar()
+		A,B = self.split_red_blue_edges(A)
+		self.spectral_partition(A,A.copy(),B)
+
+
 	def generate_model(self):
 		#initialize sparse matrix
 		A = np.triu(np.random.rand(self.n*self.k, self.n*self.k))
@@ -26,7 +35,9 @@ class SBM:
 		A = A+A.T
 
 		A[A > 0] = 1
+		return A
 
+	def split_red_blue_edges(self, A):
 		#find edge idxs
 		ai, aj = np.where(np.triu(A)>0)
 		m = len(ai)
@@ -36,20 +47,23 @@ class SBM:
 		edges1 = np.where(edges <= .5)[0]
 		edges2 = np.where(edges > .5)[0]
 
+		reordering = np.random.permutation(self.n*self.k)
+
 		A = np.zeros((self.n*self.k, self.n*self.k))
 		for x, y in zip(ai[edges1],aj[edges1]):
-			A[x,y] = 1
+			A[reordering[x],reordering[y]] = 1
 
 		B = np.zeros((self.n*self.k, self.n*self.k))
 		for x, y in zip(ai[edges2],aj[edges2]):
-			B[x,y] = 1
+			B[reordering[x],reordering[y]] = 1
 
 		# construct adjacency matrix over the random split
 		A = A+A.T
 		B = B+B.T
 
-		aa = A
-		bb = B
+		return A, B
+
+	def spectral_partition(self, A, aa, bb):
 
 		#Spectral partition part
 		#Randomly select about half indices in range(k*n)
@@ -107,7 +121,7 @@ class SBM:
 		outCxs = self.correction(outCxs, A)
 
 		#clustering Y
-		A = B
+		A = bb
 
 		dxs = []
 
@@ -129,10 +143,10 @@ class SBM:
 		f = plt.figure(1)
 		plt.imshow(A[indices,:][:,indices]);
 		plt.colorbar()
-		indices_2 = np.random.permutation(self.n*self.k)
-		f_2 = plt.figure(2)
-		plt.imshow(A[indices_2,:][:,indices_2]);
-		plt.colorbar()
+		# indices_2 = np.random.permutation(self.n*self.k)
+		# f_2 = plt.figure(2)
+		# plt.imshow(A[indices_2,:][:,indices_2]);
+		# plt.colorbar()
 		plt.show()
 
 
@@ -205,8 +219,8 @@ class SBM:
 
 
 if __name__ == "__main__":
-	s = SBM(2, 100, 20, 1)
-	s.generate_model()
+	s = SBM(3, 1000, 200, 50)
+	s.run()
 
 
 
