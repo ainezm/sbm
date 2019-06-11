@@ -14,7 +14,7 @@ class SBM:
 		red,blue = self.split_red_blue_edges(A)
 		A_shuffled = red + blue
 		(Y,Z) = self.create_bipartite_graph()
-		(outCxs, Z, Y) = self.spectral_partition(red, Y, Z)
+		(outCxs, Z, Y) = self.spectral_partition(red, blue, Y, Z)
 		outCxs = self.correction(outCxs, A_shuffled, Z)
 		recovered = self.merge(outCxs, A_shuffled, Y, blue)
 		self.plot_output(A, A_shuffled, recovered)
@@ -70,7 +70,8 @@ class SBM:
 		Z = np.where(r <= .5)[0]
 		return (Y, Z)
 
-	def spectral_partition(self, red, Y, Z):
+	def spectral_partition(self, red, blue, Y, Z):
+
 		#Randomly select about half of those indices
 		r = np.random.rand(len(Y),1)
 		Y1 = Y[np.where(r > .5)[0]]
@@ -78,6 +79,17 @@ class SBM:
 
 		#select half rows and quarter (approx) columns randomly from A
 		A1 = red[Z, :][:,Y1]
+		# zero out all rows and cols of A1 where the degree is > 20d
+		d = self.a + (self.k - 1)*self.b
+		row_degrees = np.sum(A1, axis=1)
+		col_degrees = np.sum(A1, axis=0)
+		bad_rows = np.where(row_degrees > 20*d)[0]
+		bad_cols = np.where(col_degrees > 20*d)[0]
+		if len(bad_rows)>0:
+			A1[bad_rows,:] = np.zeros(A1.shape[1])
+
+		if len(bad_cols)>0:
+			A1[:,bad_cols] = np.zeros((0,A1.shape[0]))
 		#singular value decomposition of A1
 		U,S,V = np.linalg.svd(A1)
 		
@@ -85,22 +97,27 @@ class SBM:
 		max_S = np.argsort(S)[len(S) - self.k:]
 		U = U[:,max_S]
 		#Get k equally spaced columns from Y2 - idxs not used in svd
-		colsY2 = Y2[np.linspace(0, len(Y2)-1, num=self.k, dtype= np.int16)]
+		colsY2 = Y2[np.random.randint(0, len(Y2)-1, size=2*int(np.log10(self.n)), dtype= np.int16)]
 		
 		#A2 has same rows as A1, k columns not in A1
-		A2 = red[Z,:][:,colsY2] - ((self.a+self.b)/(4*self.n))
+		A2 = red[Z,:][:,colsY2] - ((self.a+self.b)/(2*self.n))
 		#Projection of A2 onto singular values U of A1
 		projY2 = np.dot(np.dot(U,U.T),A2)
-		#Construct VV - idx is top n/2 coordinates of each proj vector
-		VV = np.zeros((self.k,int(self.n/2)))
-		for i in range(self.k):
+		#Construct group_top_coordinates: idx is top n/2k coordinates of each proj vector
+		group_top_coordinates = np.zeros((2*int(np.log10(self.n)),int(self.n/(2*self.k))))
+		group_blue_densities = []
+		for i in range(2*int(np.log10(self.n))):
 			e1 = projY2[:,i]
-			idx = np.argsort(-e1)[:int(self.n/2)]
-			VV[i,:] = Z[idx]
-
+			idx = np.argsort(-e1)[:int(self.n/(2*self.k))]
+			group_top_coordinates[i,:] = Z[idx]
+			# calculate the blue density among each group
+			# group_blue_densities.append(np.sum(blue[Z[idx],:]))
+		# idx = np.argsort(-np.array(group_blue_densities))[:len(group_blue_densities)//2]
+		# purge half of the set with the lowest blue edge density
+		# group_top_coordinates = group_top_coordinates[idx,:]
 		outCxs = []
 		for block1 in range(self.k):
-			outCx = np.setdiff1d(VV[block1,:],VV[list(range(block1)),:]).astype(int)
+			outCx = np.setdiff1d(group_top_coordinates[block1,:],group_top_coordinates[list(range(block1)),:]).astype(int)
 			outCxs.append(outCx)
 
 		return outCxs, Z, Y
@@ -190,7 +207,7 @@ class SBM:
 
 
 if __name__ == "__main__":
-	s = SBM(2, 1000, 50, 5)
+	s = SBM(3, 1000, 50, 5)
 	s.run()
 
 
