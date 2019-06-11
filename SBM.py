@@ -42,7 +42,6 @@ class SBM:
 		#find edge idxs
 		ai, aj = np.where(np.triu(A)>0)
 		m = len(ai)
-
 		#creating a random splitting of edges
 		edges = np.random.rand(m,1)
 		edges1 = np.where(edges <= .5)[0]
@@ -52,16 +51,15 @@ class SBM:
 
 		A = np.zeros((self.n*self.k, self.n*self.k))
 		for x, y in zip(ai[edges1],aj[edges1]):
-			A[x,y] = 1
+			A[reordering[x],reordering[y]] = 1
 
 		B = np.zeros((self.n*self.k, self.n*self.k))
 		for x, y in zip(ai[edges2],aj[edges2]):
-			B[x,y] = 1
+			B[reordering[x],reordering[y]] = 1
 
 		# construct adjacency matrix over the random split
 		A = A+A.T
 		B = B+B.T
-
 		return A, B
 
 	def spectral_partition(self, A):
@@ -79,25 +77,21 @@ class SBM:
 
 		#select half rows and quarter (approx) columns randomly from A
 		A1 = A[Z, :][:,Y1]
-
 		#singular value decomposition of A1
 		U,S,V = np.linalg.svd(A1)
 		V = V.T
 		
 		#get k largest singular values
-		max_S = np.argsort(S)[:self.k]
+		max_S = np.argsort(S)[len(S) - self.k:]
 		U = U[:,max_S]
 		V = V[max_S,:]
-
 		#Get k equally spaced columns from Y2 - idxs not used in svd
 		colsY2 = Y2[np.linspace(0, len(Y2)-1, num=self.k, dtype= np.int16)]
 		
 		#A2 has same rows as A1, k columns not in A1
-		A2 = A[Z,:][:,colsY2] - (self.a+self.b)/(4*self.n)
-
+		A2 = A[Z,:][:,colsY2] - ((self.a+self.b)/(4*self.n))
 		#Projection of A2 onto singular values U of A1
 		projY2 = np.dot(np.dot(U,U.T),A2)
-
 		#Construct VV - idx is top n/2 coordinates of each proj vector
 		VV = np.zeros((self.k,int(self.n/2)))
 		for i in range(self.k):
@@ -208,7 +202,7 @@ class SBM:
 
 
 if __name__ == "__main__":
-	s = SBM(3, 1000, 50, 5)
+	s = SBM(4, 1000, 50, 5)
 	s.run()
 
 
