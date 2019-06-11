@@ -1,4 +1,4 @@
-function [V] = SBMk2(n,a,b)
+function [k] = SBMk_orig(n,a,b)
 
 k=3;
 
@@ -18,7 +18,6 @@ end
 
 A = triu(A,1); 
 A = sparse(A+A'); A(A>0) = 1;
-
 tic;
 
 [ai,aj,av] = find(triu(A));
