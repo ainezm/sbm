@@ -12,8 +12,9 @@ class SBM:
 
 	def run(self):
 		A = self.generate_model()
-		red,blue = self.split_red_blue_edges(A)
-		A_shuffled = red + blue
+		reordering = np.random.permutation(self.n*self.k)
+		A_shuffled = A[reordering,:][:,reordering]
+		red,blue = self.split_red_blue_edges(A_shuffled)
 		(Y,Z) = self.create_bipartite_graph()
 		(outCxs, Z, Y) = self.spectral_partition(red, blue, Y, Z)
 		outCxs = self.correction(outCxs, A_shuffled, Z)
@@ -49,15 +50,13 @@ class SBM:
 		edges1 = np.where(edges <= .5)[0]
 		edges2 = np.where(edges > .5)[0]
 
-		reordering = np.random.permutation(self.n*self.k)
-
 		A = np.zeros((self.n*self.k, self.n*self.k))
 		for x, y in zip(ai[edges1],aj[edges1]):
-			A[reordering[x],reordering[y]] = 1
+			A[x,y] = 1
 
 		B = np.zeros((self.n*self.k, self.n*self.k))
 		for x, y in zip(ai[edges2],aj[edges2]):
-			B[reordering[x],reordering[y]] = 1
+			B[x,y] = 1
 
 		# construct adjacency matrix over the random split
 		A = A+A.T
@@ -132,8 +131,8 @@ class SBM:
 						tried_combos[(i,j)]=len(np.intersect1d(group_top_coordinates[i,:],group_top_coordinates[j,:]))
 					if tried_combos[(i,j)]>= .2*self.n/(2*self.k):
 						good_combo = False
-					# combo_score[index] += tried_combos[(i,j)]**2
-					combo_score[index] = max(combo_score[index],tried_combos[(i,j)])
+					combo_score[index] += tried_combos[(i,j)]**2
+					#combo_score[index] = max(combo_score[index],tried_combos[(i,j)])
 			if good_combo:
 				outCxs = group_top_coordinates[combo,:].astype(int)
 				break
@@ -166,7 +165,7 @@ class SBM:
 
 
 	def merge(self, outCxs, A, Y, blue):
-		dZZ = 1.5*(self.a+self.b)/4
+		dZZ = (self.a+self.b)/8
 		bad_xy = {}
 		for block1 in range(self.k):
 			for block2 in range(block1+1, self.k):
@@ -234,7 +233,7 @@ class SBM:
 
 
 if __name__ == "__main__":
-	s = SBM(3, 1000, 50, 5)
+	s = SBM(4, 1000, 50, 5)
 	s.run()
 
 
