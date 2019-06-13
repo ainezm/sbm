@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.sparse
 import matplotlib.pyplot as plt
+import itertools
 
 class SBM:
 	def __init__(self, k, n, a, b):
@@ -97,28 +98,54 @@ class SBM:
 		max_S = np.argsort(S)[len(S) - self.k:]
 		U = U[:,max_S]
 		#Get k equally spaced columns from Y2 - idxs not used in svd
-		colsY2 = Y2[np.random.randint(0, len(Y2)-1, size=2*int(np.log10(self.n)), dtype= np.int16)]
+		colsY2 = Y2[np.random.randint(0, len(Y2)-1, size=2*int(np.log2(self.n)), dtype= np.int16)]
 		
 		#A2 has same rows as A1, k columns not in A1
 		A2 = red[Z,:][:,colsY2] - ((self.a+self.b)/(2*self.n))
 		#Projection of A2 onto singular values U of A1
 		projY2 = np.dot(np.dot(U,U.T),A2)
 		#Construct group_top_coordinates: idx is top n/2k coordinates of each proj vector
-		group_top_coordinates = np.zeros((2*int(np.log10(self.n)),int(self.n/(2*self.k))))
+		group_top_coordinates = np.zeros((2*int(np.log2(self.n)),int(self.n/(2*self.k))))
 		group_blue_densities = []
-		for i in range(2*int(np.log10(self.n))):
+		for i in range(2*int(np.log2(self.n))):
 			e1 = projY2[:,i]
 			idx = np.argsort(-e1)[:int(self.n/(2*self.k))]
 			group_top_coordinates[i,:] = Z[idx]
 			# calculate the blue density among each group
-			# group_blue_densities.append(np.sum(blue[Z[idx],:]))
-		# idx = np.argsort(-np.array(group_blue_densities))[:len(group_blue_densities)//2]
+			group_blue_densities.append(np.sum(blue[Z[idx],:]))
+		idx = np.argsort(-np.array(group_blue_densities))[:len(group_blue_densities)//2]
 		# purge half of the set with the lowest blue edge density
-		# group_top_coordinates = group_top_coordinates[idx,:]
-		outCxs = []
-		for block1 in range(self.k):
-			outCx = np.setdiff1d(group_top_coordinates[block1,:],group_top_coordinates[list(range(block1)),:]).astype(int)
-			outCxs.append(outCx)
+		group_top_coordinates = group_top_coordinates[idx,:]
+
+		#Find groups with smallest intersection
+		tried_combos = {}
+		outCxs = None
+		combos = list(itertools.combinations(range(len(group_top_coordinates)), self.k))
+		combo_score = np.zeros(len(combos))
+		for index, combo in enumerate(combos):
+			good_combo = True
+			for i in combo:
+				for j in combo:
+					if j<=i:
+						continue
+					if (i,j) not in tried_combos:
+						tried_combos[(i,j)]=len(np.intersect1d(group_top_coordinates[i,:],group_top_coordinates[j,:]))
+					if tried_combos[(i,j)]>= .2*self.n/(2*self.k):
+						good_combo = False
+					# combo_score[index] += tried_combos[(i,j)]**2
+					combo_score[index] = max(combo_score[index],tried_combos[(i,j)])
+			if good_combo:
+				outCxs = group_top_coordinates[combo,:].astype(int)
+				break
+
+		if outCxs is None:
+			top_combo = np.argmin(combo_score)
+			outCxs = group_top_coordinates[combos[top_combo],:].astype(int)
+			print("oops")
+			# outCxs = []
+			# for block1 in range(self.k):
+			# 	outCx = np.setdiff1d(group_top_coordinates[block1,:],group_top_coordinates[list(range(block1)),:]).astype(int)
+			# 	outCxs.append(outCx)
 
 		return outCxs, Z, Y
 
