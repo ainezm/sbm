@@ -2,6 +2,7 @@ import numpy as np
 import scipy.sparse
 import matplotlib.pyplot as plt
 import itertools
+import time
 
 class SBM:
 	def __init__(self, k, n, a, b):
@@ -11,14 +12,31 @@ class SBM:
 		self.b = float(b)
 
 	def run(self):
+		start = time.time(); beginning_of_time = start
 		A = self.generate_model()
+		print("generate SBM takes: %s sec" %(time.time() - start))
+		start = time.time()
 		reordering = np.random.permutation(self.n*self.k)
 		A_shuffled = A[reordering,:][:,reordering]
+		print("shuffle takes: %s sec" %(time.time() - start))
+		start = time.time()
 		red,blue = self.split_red_blue_edges(A_shuffled)
+		print("split red blue edges takes: %s sec" %(time.time() - start))
+		start = time.time()
 		(Y,Z) = self.create_bipartite_graph()
+		print("create bipartite graph: %s sec" %(time.time() - start))
+		start = time.time()
 		(outCxs, Z, Y) = self.spectral_partition(red, blue, Y, Z)
+		print("spectral_partition takes: %s sec" %(time.time() - start))
+		start = time.time()
+		[print(outCx.shape) for outCx in outCxs]
+		print(Z.shape)
 		outCxs = self.correction(outCxs, A_shuffled, Z)
+		print("correction takes: %s sec" %(time.time() - start))
+		start = time.time()
 		recovered = self.merge(outCxs, A_shuffled, Y, blue)
+		print("merge takes: %s sec" %(time.time() - start))
+		print("total time: %s sec" % (time.time() - beginning_of_time))
 		self.plot_output(A, A_shuffled, recovered)
 
 
@@ -87,9 +105,11 @@ class SBM:
 		bad_cols = np.where(col_degrees > 20*d)[0]
 		if len(bad_rows)>0:
 			A1[bad_rows,:] = np.zeros(A1.shape[1])
+			print("BADROWS %s" % bad_rows)
 
 		if len(bad_cols)>0:
 			A1[:,bad_cols] = np.zeros((0,A1.shape[0]))
+			print("BADCOLS %s" % bad_cols)
 		#singular value decomposition of A1
 		U,S,V = np.linalg.svd(A1)
 		
@@ -100,6 +120,7 @@ class SBM:
 		colsY2 = Y2[np.random.randint(0, len(Y2)-1, size=2*int(np.log2(self.n)), dtype= np.int16)]
 		
 		#A2 has same rows as A1, k columns not in A1
+		start = time.time()
 		A2 = red[Z,:][:,colsY2] - ((self.a+self.b)/(2*self.n))
 		#Projection of A2 onto singular values U of A1
 		projY2 = np.dot(np.dot(U,U.T),A2)
@@ -149,6 +170,8 @@ class SBM:
 		return outCxs, Z, Y
 
 	def plot_output(self, A, A_shuffled, recovered):
+		print(A.shape)
+		print(recovered.shape)
 		f = plt.figure("original blocked")
 		plt.imshow(A);
 		plt.colorbar()
@@ -233,6 +256,12 @@ class SBM:
 
 
 if __name__ == "__main__":
+	# beginning_of_time = time.time()
+	# num_test = 10
+	# for i in range(num_test):
+	# 	s = SBM(4, 1000, 50, 5)
+	# 	s.run()
+	# print("Running %s takes: %s sec" %(num_test, time.time() - beginning_of_time))
 	s = SBM(4, 1000, 50, 5)
 	s.run()
 

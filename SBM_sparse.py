@@ -4,6 +4,7 @@ from scipy.sparse.linalg import svds
 import matplotlib.pyplot as plt
 import itertools
 import time
+import sys
 
 class SBM:
     def __init__(self, k, n, a, b):
@@ -13,32 +14,39 @@ class SBM:
         self.b = float(b)
 
     def run(self):
-        start = time.time(); beginning_of_time = start
-        A = self.generate_model()
-        print("generate SBM takes: %s sec" %(time.time() - start))
-        start = time.time()
-        reordering = np.random.permutation(self.n*self.k)
-        A_shuffled = A[reordering,:][:,reordering]
-        print("shuffle takes: %s sec" %(time.time() - start))
-        start = time.time()
-        red,blue = self.split_red_blue_edges(A_shuffled)
-        print("split red blue edges takes: %s sec" %(time.time() - start))
-        start = time.time()
-        (Y,Z) = self.create_bipartite_graph()
-        print("create bipartite graph: %s sec" %(time.time() - start))
-        start = time.time()
-        (outCxs, Z, Y) = self.spectral_partition(red, blue, Y, Z)
-        print("spectral_partition takes: %s sec" %(time.time() - start))
-        start = time.time()
-        [print(outCx.shape) for outCx in outCxs]
-        print(Z.shape)
-        outCxs = self.correction(outCxs, A_shuffled, Z)
-        print("correction takes: %s sec" %(time.time() - start))
-        start = time.time()
-        recovered = self.merge(outCxs, A_shuffled, Y, blue)
-        print("merge takes: %s sec" %(time.time() - start))
-        print("total time: %s sec" % (time.time() - beginning_of_time))
-        self.plot_output(A, A_shuffled, recovered)
+            run_existing_model = sys.argv[1]
+            start = time.time(); beginning_of_time = start
+            if ( run_existing_model == '0'):
+                A = self.generate_model()
+                sparse.save_npz("blocked_matrix_2blocks.txt",A)
+                print("generate SBM takes: %s sec" %(time.time() - start))
+            else :
+                A = sparse.load_npz("blocked_matrix_2blocks.txt.npz")
+            start = time.time()
+            reordering = np.random.permutation(self.n*self.k)
+            A_shuffled = A[reordering,:][:,reordering]
+            sparse.save_npz("shuffled_matrix_2blocks.txt", A_shuffled)
+            print("shuffle takes: %s sec" %(time.time() - start))
+            start = time.time()
+            red,blue = self.split_red_blue_edges(A_shuffled)
+            print("split red blue edges takes: %s sec" %(time.time() - start))
+            start = time.time()
+            (Y,Z) = self.create_bipartite_graph()
+            print("create bipartite graph: %s sec" %(time.time() - start))
+            start = time.time()
+            (outCxs, Z, Y) = self.spectral_partition(red, blue, Y, Z)
+            print("spectral_partition takes: %s sec" %(time.time() - start))
+            start = time.time()
+            [print(outCx.shape) for outCx in outCxs]
+            print(Z.shape)
+            outCxs = self.correction(outCxs, A_shuffled, Z)
+            print("correction takes: %s sec" %(time.time() - start))
+            start = time.time()
+            recovered = self.merge(outCxs, A_shuffled, Y, blue)
+            sparse.save_npz("recovered_2blocks.txt", recovered)
+            print("merge takes: %s sec" %(time.time() - start))
+            print("total time: %s sec" % (time.time() - beginning_of_time))
+            self.plot_output(A, A_shuffled, recovered)
 
     def generate_model(self):
         # initialize sparse matrix
